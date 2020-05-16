@@ -1,84 +1,29 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-char *VertexShaderSource = "#version 330 core\n"
-"layout (location = 0) in vec2 Pos;\n"
-"void main(){\n"
-"	gl_Position = vec4(Pos.x, Pos.y, 0.0, 1.0f);\n"
-"}\0";
-
-char *FragmentShaderSource = "#version 330 core\n"
-"out vec4 OutColor;\n"
-"uniform vec3 Color;\n"
-"void main(){\n"
-"	OutColor = vec4(Color.r, Color.g, Color.b, 1.0f);\n"
-"}\0";
-
-//TODO: redefine as variables
-#define ReadSize (2048)
-#define FftSize ReadSize/2+1
-
-typedef struct {
-	u32 Shader;
-	u32 VBO;
-} renderCtx;
+//TODO: remove this
+#define MaxFftSize SAMP_RATE
 
 typedef struct {
 	u64         MemorySize;
-	renderCtx   RenderCtx;
 	bool        Initialized;
-	u32         PrevReads;
+
 	memoryArena TempArena;
+
+	renderCtx   RenderCtx;
+	uiCtx   	UiCtx;
+
+	u32 ReadSize;
+	u32 PrevReads;
 
 	bool DecayReset;
 
 	r32 Buffer[SAMP_RATE];
 
-	r32 FftAvgMagDb[FftSize];
-	r32 FftDecayMagDb[FftSize];
-	r32 FftDecayTime[FftSize];
+	r32 FftAvgMagDb[MaxFftSize];
+	r32 FftDecayMagDb[MaxFftSize];
+	r32 FftDecayTime[MaxFftSize];
 } program;
-
-void DrawLineStrip(r32 *Points, u32 NPoints, r32 r, r32 g, r32 b, renderCtx *RenderCtx){
-	glBindBuffer(GL_ARRAY_BUFFER, RenderCtx->VBO);
-	glBufferData(GL_ARRAY_BUFFER, NPoints*sizeof(r32)*2, Points, GL_STREAM_DRAW);
-
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-
-	glUseProgram(RenderCtx->Shader);
-
-	u32 ColorUniform = glGetUniformLocation(RenderCtx->Shader, "Color");
-	glUniform3f(ColorUniform, r, g, b);
-
-	glDrawArrays(GL_LINE_STRIP, 0, NPoints);
-}
-
-void DrawLines(r32 *Points, u32 NPoints, r32 r, r32 g, r32 b, renderCtx *RenderCtx){
-	glBindBuffer(GL_ARRAY_BUFFER, RenderCtx->VBO);
-	glBufferData(GL_ARRAY_BUFFER, NPoints*sizeof(r32)*2, Points, GL_STREAM_DRAW);
-
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-
-	glUseProgram(RenderCtx->Shader);
-
-	u32 ColorUniform = glGetUniformLocation(RenderCtx->Shader, "Color");
-	glUniform3f(ColorUniform, r, g, b);
-
-	glDrawArrays(GL_LINES, 0, NPoints);
-}
-
-/*
-void DrawOscilloscope(i16 *Buffer, u32 Count, renderCtx *RenderCtx, memoryArena *Arena){
-	r32 *Points = ArenaAllocArray(Arena, r32, 2*Count);
-	for(int i = 0; i < Count; i++){
-		Points[2*i] = -1.0+2.0/(Count-1)*i;
-		Points[2*i+1] = -Buffer[i]*1.0/INT16_MIN;
-	}
-	DrawLineStrip(Points, Count, 0.0, 1.0, 0.0, RenderCtx);
-}
-*/
 
 void DrawSpectrum(r32 *FftMagDb, r32 *FftDecayDb, u32 Count, renderCtx *RenderCtx, memoryArena *Arena){
 	r32 *Points = ArenaAllocArray(Arena, r32, MAX(2*Count, 4*SAMP_RATE/2000));
@@ -117,47 +62,30 @@ void DrawSpectrum(r32 *FftMagDb, r32 *FftDecayDb, u32 Count, renderCtx *RenderCt
 	DrawLines(Points, 2*DbScale, 0.2, 0.2, 0.2, RenderCtx);
 }
 
-u32 LoadShader(char *VertexShaderSource, char *FragmentShaderSource){
-	u32 VertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(VertexShader, 1, &VertexShaderSource, 0);
-	glCompileShader(VertexShader);
+#define GUI_WIDTH 300.0f
+void UpdateGUI(program *Program){
+	r32 SF = 2.0f*GUI_WIDTH/Program->RenderCtx.Width;
+	r32 AR = Program->RenderCtx.Width*1.0f/Program->RenderCtx.Height;
 
-	char Log[512];
-	i32 status;
-	glGetShaderiv(VertexShader, GL_COMPILE_STATUS, &status);
-	if(!status){
-		glGetShaderInfoLog(VertexShader, 512, NULL, Log);
-		OutputDebugStringA(Log);
+	DrawString("FFT Size:", 1.0f-0.5f*SF, 0.2f*SF*AR, 5.0f,&Program->TempArena, &Program->RenderCtx);
+	char FFTSizeString[32] = {0};
+	snprintf(FFTSizeString, 32, "%u", Program->ReadSize);
+	DrawString(FFTSizeString, 1.0f-0.5f*SF, 0.15f*0.5f*SF*AR, 5.0f,&Program->TempArena, &Program->RenderCtx);
+
+	if(Button(1, "+", (rect){1.0f-0.25*SF, 0.0f, 0.15*SF, 0.15*SF*AR}, &Program->UiCtx, &Program->TempArena, &Program->RenderCtx)){
+		Program->ReadSize *= 2;
+		Program->DecayReset = 0;
 	}
 
-	u32 FragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(FragmentShader, 1, &FragmentShaderSource, 0);
-	glCompileShader(FragmentShader);
-	glGetShaderiv(FragmentShader, GL_COMPILE_STATUS, &status);
-	if(!status){
-		glGetShaderInfoLog(VertexShader, 512, NULL, Log);
-		OutputDebugStringA(Log);
+	if(Button(2, "-", (rect){1.0f-0.9*SF, 0.0f, 0.15*SF, 0.15*SF*AR}, &Program->UiCtx, &Program->TempArena, &Program->RenderCtx)){
+		Program->ReadSize /= 2;
+		Program->DecayReset = 0;
 	}
 
-	u32 Shader = glCreateProgram();
-	glAttachShader(Shader, VertexShader);
-	glAttachShader(Shader, FragmentShader);
-	glLinkProgram(Shader);
-		
-	glGetProgramiv(Shader, GL_LINK_STATUS, &status);
-	if(!status) {
-		glGetProgramInfoLog(Shader, 512, NULL, Log);
-		OutputDebugStringA(Log);
-	}
-	
-	glDeleteShader(VertexShader);
-	glDeleteShader(FragmentShader);  
-
-	return Shader;
 }
 
 static program *Program;
-void Frame(void *Memory, u64 MemorySize, u32 WindowWidth, u32 WindowHeight){
+void Frame(void *Memory, u64 MemorySize, u32 WindowWidth, u32 WindowHeight, r32 MouseX, r32 MouseY, u32 MouseEvent){
 	ASSERT(sizeof(Program) > MemorySize);
 
 	Program = Memory;
@@ -168,32 +96,39 @@ void Frame(void *Memory, u64 MemorySize, u32 WindowWidth, u32 WindowHeight){
 			.Size = MemorySize - sizeof(program),
 		};
 
-		Program->RenderCtx.Shader = LoadShader(VertexShaderSource, FragmentShaderSource);
-		glGenBuffers(1, &Program->RenderCtx.VBO);
+		Program->RenderCtx = InitRendering();
+
+		Program->ReadSize = 2048;
 		Program->Initialized = true;
 	}
 
-	glViewport(0, 0, WindowWidth, WindowHeight);
+	Program->UiCtx.MouseX = MouseX;
+	Program->UiCtx.MouseY = MouseY;
+	Program->UiCtx.MouseEvent = MouseEvent;
+
+	u32 FftSize = Program->ReadSize/2+1;	
+
+	Resize(0, 0, WindowWidth-GUI_WIDTH, WindowHeight, &Program->RenderCtx);
 
 	//Get size of memory needed for fft
 	u64 FftMemNeeded = 1;
-	kiss_fftr_alloc(ReadSize, 0, 0, &FftMemNeeded);
+	kiss_fftr_alloc(Program->ReadSize, 0, 0, &FftMemNeeded);
 
 	//Alocate and initialize fft memory
 	i16 *FftMemory = ArenaAllocArray(&Program->TempArena, u8, FftMemNeeded);
 
-	kiss_fftr_cfg FftCfg = kiss_fftr_alloc(ReadSize, 0, FftMemory, &FftMemNeeded);
+	kiss_fftr_cfg FftCfg = kiss_fftr_alloc(Program->ReadSize, 0, FftMemory, &FftMemNeeded);
 	r32C *FftOut = ArenaAllocArray(&Program->TempArena, r32C, FftSize);
-	r32  *FftIn  = ArenaAllocArray(&Program->TempArena, r32, ReadSize);
+	r32  *FftIn  = ArenaAllocArray(&Program->TempArena, r32, Program->ReadSize);
 
 	//Temporary buffer for capture buffer data
-	i16 *TempBuffer = ArenaAllocArray(&Program->TempArena, i16, ReadSize);
+	i16 *TempBuffer = ArenaAllocArray(&Program->TempArena, i16, Program->ReadSize);
 	int Reads = 0;	
-	while(ReadCaptureBuffer(TempBuffer, ReadSize*sizeof(i16))){
+	while(ReadCaptureBuffer(TempBuffer, Program->ReadSize*sizeof(i16))){
 		//Convert to r32
-		for(int i = 0; i < ReadSize; i++){
+		for(int i = 0; i < Program->ReadSize; i++){
 			FftIn[i] = -TempBuffer[i]*1.0/INT16_MIN;
-			FftIn[i] *= 0.5*(1-cos(2*M_PI*i/ReadSize));
+			FftIn[i] *= 0.5*(1-cos(2*M_PI*i/Program->ReadSize));
 		}
 
 		//Calculate fft
@@ -230,27 +165,34 @@ void Frame(void *Memory, u64 MemorySize, u32 WindowWidth, u32 WindowHeight){
 		for(int i = 0; i < FftSize; i++){
 			Program->FftAvgMagDb[i] = logf(Program->FftAvgMagDb[i]);
 		}
+	}
 
-		for(int i = 0; i < FftSize; i++){
-			if(Program->FftDecayMagDb[i] < Program->FftAvgMagDb[i] || !Program->DecayReset){
-				Program->FftDecayMagDb[i] = Program->FftAvgMagDb[i];
-				Program->FftDecayTime[i] = 0.1;
+	for(int i = 0; i < FftSize; i++){
+		if(Program->FftDecayMagDb[i] < Program->FftAvgMagDb[i] || !Program->DecayReset){
+			Program->FftDecayMagDb[i] = Program->FftAvgMagDb[i];
+			Program->FftDecayTime[i] = 0.1;
+		}
+		else{
+			if(Program->FftDecayTime[i] < 0.0){
+				Program->FftDecayMagDb[i] -= 0.1;
 			}
 			else{
-				if(Program->FftDecayTime[i] < 0.0){
-					Program->FftDecayMagDb[i] -= 0.1;
-				}
-				else{
-					Program->FftDecayTime[i] -= FRAME_TIME;
-				}
+				Program->FftDecayTime[i] -= FRAME_TIME;
 			}
 		}
+	}
+
+	if(Reads != 0){
 		Program->DecayReset = 1;
 	}
 
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	DrawSpectrum(Program->FftAvgMagDb, Program->FftDecayMagDb, FftSize, &Program->RenderCtx, &Program->TempArena);
+
+	Resize(0, 0, WindowWidth, WindowHeight, &Program->RenderCtx);
+
+	UpdateGUI(Program);
 
 	ClearArena(&Program->TempArena);
 }

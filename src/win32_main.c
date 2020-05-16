@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <windows.h>
+#include <windowsx.h>
 #include <dsound.h>
 #include <gl/gl.h>
 
 #include "ext/glext.h"
 #include "ext/wglext.h"
+#include "ext/stb_easy_font.h"
 
 #include "common.h"
 #include "system.h"
@@ -21,11 +23,17 @@
 #include "ext/kiss_fft.c"
 #include "ext/kiss_fftr.c"
 #include "memory_arena.c"
+#include "render.c"
+#include "ui.c"
 #include "program.c"
 
 static bool Running;
 static u32 Width;
 static u32 Height;
+
+r32 MouseX;
+r32 MouseY;
+u32 MouseEvent;
 
 LRESULT CALLBACK Win32WindowProc(HWND   hwnd,
 				UINT   uMsg,
@@ -43,6 +51,27 @@ LRESULT CALLBACK Win32WindowProc(HWND   hwnd,
 		case WM_DESTROY:
 		case WM_CLOSE: {
 			Running = 0;
+		}
+		break;
+		case WM_LBUTTONDOWN: {
+			if(MouseEvent == ME_None){
+				MouseEvent = ME_LDown;
+				MouseX = 2.0f*(GET_X_LPARAM(lParam)*1.0/Width-0.5f); 
+				MouseY = 2.0f*(GET_Y_LPARAM(lParam)*1.0/Height-0.5f); 
+			}
+		}
+		break;
+		case WM_LBUTTONUP: {
+			MouseEvent = ME_LUp;
+			MouseX = 2.0f*(GET_X_LPARAM(lParam)*1.0/Width-0.5f); 
+			MouseY = 2.0f*(GET_Y_LPARAM(lParam)*1.0/Height-0.5f); 
+		}
+		break;
+		case WM_MOUSEMOVE: {
+			if(MouseEvent == ME_None){
+				MouseX = 2.0f*(GET_X_LPARAM(lParam)*1.0/Width-0.5f); 
+				MouseY = 2.0f*(GET_Y_LPARAM(lParam)*1.0/Height-0.5f); 
+			}
 		}
 		break;
 		case WM_ACTIVATEAPP: {
@@ -321,9 +350,11 @@ INT WinMain(HINSTANCE hInstance,
 		}
 
 		HDC WindowDC = GetDC(Window);
-		Frame(Memory, MemorySize, Width, Height);
+		Frame(Memory, MemorySize, Width, Height, MouseX, MouseY, MouseEvent);
 		SwapBuffers(WindowDC);
 		ReleaseDC(Window, WindowDC);
+
+		MouseEvent = ME_None;
 
 		LARGE_INTEGER CurrentCounter;
 		QueryPerformanceCounter(&CurrentCounter);

@@ -20,3 +20,5 @@ GLLoad(DELETESHADER, DeleteShader);
 
 GLLoad(GETUNIFORMLOCATION, GetUniformLocation);
 GLLoad(UNIFORM3F, Uniform3f);
+GLLoad(UNIFORM2F, Uniform2f);
+GLLoad(UNIFORM1F, Uniform1f);
