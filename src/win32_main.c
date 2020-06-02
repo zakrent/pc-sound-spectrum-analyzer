@@ -57,20 +57,20 @@ LRESULT CALLBACK Win32WindowProc(HWND   hwnd,
 			if(MouseEvent == ME_None){
 				MouseEvent = ME_LDown;
 				MouseX = 2.0f*(GET_X_LPARAM(lParam)*1.0/Width-0.5f); 
-				MouseY = 2.0f*(GET_Y_LPARAM(lParam)*1.0/Height-0.5f); 
+				MouseY = -2.0f*(GET_Y_LPARAM(lParam)*1.0/Height-0.5f); 
 			}
 		}
 		break;
 		case WM_LBUTTONUP: {
 			MouseEvent = ME_LUp;
 			MouseX = 2.0f*(GET_X_LPARAM(lParam)*1.0/Width-0.5f); 
-			MouseY = 2.0f*(GET_Y_LPARAM(lParam)*1.0/Height-0.5f); 
+			MouseY = -2.0f*(GET_Y_LPARAM(lParam)*1.0/Height-0.5f); 
 		}
 		break;
 		case WM_MOUSEMOVE: {
 			if(MouseEvent == ME_None){
 				MouseX = 2.0f*(GET_X_LPARAM(lParam)*1.0/Width-0.5f); 
-				MouseY = 2.0f*(GET_Y_LPARAM(lParam)*1.0/Height-0.5f); 
+				MouseY = -2.0f*(GET_Y_LPARAM(lParam)*1.0/Height-0.5f); 
 			}
 		}
 		break;
@@ -86,10 +86,13 @@ LRESULT CALLBACK Win32WindowProc(HWND   hwnd,
 }
 
 bool Win32InitOpenGL(HINSTANCE hInstance, HWND *Window){
+	HCURSOR Cursor = LoadCursor(NULL, IDC_ARROW);
+	
 	WNDCLASSA WindowClass = {
 		.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
 		.lpfnWndProc   = Win32WindowProc,
 		.hInstance     = hInstance,
+		.hCursor       = Cursor,
 		.lpszClassName = "SierraWC",
 	};
 	
@@ -327,7 +330,7 @@ INT WinMain(HINSTANCE hInstance,
 		}
 	}
 
-	u64 MemorySize = MEBIBYTES(1);
+	u64 MemorySize = MEBIBYTES(32);
 	void* Memory = malloc(MemorySize);
 	
 	Running = 1;
@@ -350,9 +353,14 @@ INT WinMain(HINSTANCE hInstance,
 		}
 
 		HDC WindowDC = GetDC(Window);
-		Frame(Memory, MemorySize, Width, Height, MouseX, MouseY, MouseEvent);
+		bool ShouldExit = Frame(Memory, MemorySize, Width, Height, MouseX, MouseY, MouseEvent);
+		if(ShouldExit){
+			Running = 0;
+		}
 		SwapBuffers(WindowDC);
 		ReleaseDC(Window, WindowDC);
+		
+		printf("X: %f, Y:%f\n", MouseX, MouseY);
 
 		MouseEvent = ME_None;
 

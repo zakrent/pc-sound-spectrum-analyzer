@@ -8,6 +8,12 @@ typedef struct {
 	u32 Height;
 } renderCtx;
 
+enum TextFlags{
+	TF_None = 0,
+	TF_AlignLeft  = 1<<1,
+	TF_AlignRight = 1<<2,
+};
+
 char *VertexShaderSource = "#version 330 core\n"
 "layout (location = 0) in vec2 Pos;\n"
 "void main(){\n"
@@ -139,13 +145,21 @@ void DrawTriangles(r32 *Points, u32 NPoints, r32 r, r32 g, r32 b, renderCtx *Ren
 	glDrawArrays(GL_TRIANGLES, 0, NPoints);
 }
 
-void DrawString(char *Text, r32 xC, r32 yC, r32 Scale, memoryArena *Arena, renderCtx *RenderCtx){
+void DrawString(char *Text, r32 xC, r32 yC, r32 Scale, u8 Flags, memoryArena *Arena, renderCtx *RenderCtx){
 	i32 Size = strlen(Text);
 	i32 BufferSize = 1000*Size;
 	r32 *Points = ArenaAllocArray(Arena, r32, BufferSize);
 
-	r32 x = xC/Scale*RenderCtx->Width-stb_easy_font_width(Text)*0.5f;
-	r32 y = -yC/Scale*RenderCtx->Height-stb_easy_font_height(Text)*0.5f+2.0f;
+	r32 x = xC/Scale*RenderCtx->Width+0.5f;
+	r32 y = -yC/Scale*RenderCtx->Height-stb_easy_font_height(Text)*0.5f+2.5f;
+
+	if(Flags & TF_AlignRight){
+		x -= stb_easy_font_width(Text)*1.0f;
+	}
+	else if(!(Flags & TF_AlignLeft)){
+		x -= stb_easy_font_width(Text)*0.5f;
+	}
+
 	i32 NumQuads = stb_easy_font_print(x, y, Text, NULL, Points, BufferSize);
 
 	u32 *Indexes = ArenaAllocArray(Arena, r32, NumQuads*6);
@@ -175,7 +189,7 @@ void DrawString(char *Text, r32 xC, r32 yC, r32 Scale, memoryArena *Arena, rende
 	glUniform1f(ScaleUniform, Scale);
 
 	i32 ColorUniform = glGetUniformLocation(RenderCtx->TextShader, "Color");
-	glUniform3f(ColorUniform, 1.0f, 0.5f, 0.0f);
+	glUniform3f(ColorUniform, 1.0f*0.8f, 0.5f*0.8f, 0.0f);
 
 	i32 WindowSizeUniform = glGetUniformLocation(RenderCtx->TextShader, "WindowSize");
 	glUniform2f(WindowSizeUniform, RenderCtx->Width, RenderCtx->Height);
