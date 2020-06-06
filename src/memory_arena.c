@@ -1,5 +1,10 @@
+#ifndef __linux__
 #define ArenaAlloc(Arena, Type) ArenaAllocRaw(Arena, sizeof(Type), _alignof(Type))
 #define ArenaAllocArray(Arena, Type, n) ArenaAllocRaw(Arena, sizeof(Type)*n, _alignof(Type))
+#else
+#define ArenaAlloc(Arena, Type) ArenaAllocRaw(Arena, sizeof(Type), __alignof__(Type))
+#define ArenaAllocArray(Arena, Type, n) ArenaAllocRaw(Arena, sizeof(Type)*n, __alignof__(Type))
+#endif
 
 typedef struct {
 	u8 *Data;

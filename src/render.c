@@ -14,20 +14,20 @@ enum TextFlags{
 	TF_AlignRight = 1<<2,
 };
 
-char *VertexShaderSource = "#version 330 core\n"
+const char *VertexShaderSource = "#version 330 core\n"
 "layout (location = 0) in vec2 Pos;\n"
 "void main(){\n"
 "	gl_Position = vec4(Pos.x, Pos.y, 0.0, 1.0f);\n"
 "}\0";
 
-char *FragmentShaderSource = "#version 330 core\n"
+const char *FragmentShaderSource = "#version 330 core\n"
 "out vec4 OutColor;\n"
 "uniform vec3 Color;\n"
 "void main(){\n"
 "	OutColor = vec4(Color.r, Color.g, Color.b, 1.0f);\n"
 "}\0";
 
-char *TextVertexShaderSource = "#version 330 core\n"
+const char *TextVertexShaderSource = "#version 330 core\n"
 "layout (location = 0) in vec2 Pos;\n"
 "uniform vec2 WindowSize;\n"
 "uniform float Scale;\n"
@@ -37,14 +37,14 @@ char *TextVertexShaderSource = "#version 330 core\n"
 "	gl_Position = vec4(Pos.x*ScaleNorm, -Pos.y*ScaleNorm*AR, 0.0, 1.0f);\n"
 "}\0";
 
-char *TextFragmentShaderSource = "#version 330 core\n"
+const char *TextFragmentShaderSource = "#version 330 core\n"
 "out vec4 OutColor;\n"
 "uniform vec3 Color;\n"
 "void main(){\n"
 "	OutColor = vec4(Color.r, Color.g, Color.b, 1.0f);\n"
 "}\0";
 
-u32 LoadShader(char *VertexShaderSource, char *FragmentShaderSource){
+u32 LoadShader(const char *VertexShaderSource, const char *FragmentShaderSource){
 	u32 VertexShader = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(VertexShader, 1, &VertexShaderSource, 0);
 	glCompileShader(VertexShader);
@@ -54,7 +54,9 @@ u32 LoadShader(char *VertexShaderSource, char *FragmentShaderSource){
 	glGetShaderiv(VertexShader, GL_COMPILE_STATUS, &status);
 	if(!status){
 		glGetShaderInfoLog(VertexShader, 512, NULL, Log);
+#ifndef __linux__
 		OutputDebugStringA(Log);
+#endif
 	}
 
 	u32 FragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -63,7 +65,9 @@ u32 LoadShader(char *VertexShaderSource, char *FragmentShaderSource){
 	glGetShaderiv(FragmentShader, GL_COMPILE_STATUS, &status);
 	if(!status){
 		glGetShaderInfoLog(VertexShader, 512, NULL, Log);
+#ifndef __linux__
 		OutputDebugStringA(Log);
+#endif
 	}
 
 	u32 Shader = glCreateProgram();
@@ -74,7 +78,9 @@ u32 LoadShader(char *VertexShaderSource, char *FragmentShaderSource){
 	glGetProgramiv(Shader, GL_LINK_STATUS, &status);
 	if(!status) {
 		glGetProgramInfoLog(Shader, 512, NULL, Log);
+#ifndef __linux__
 		OutputDebugStringA(Log);
+#endif
 	}
 	
 	glDeleteShader(VertexShader);

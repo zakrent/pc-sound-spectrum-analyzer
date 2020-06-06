@@ -117,7 +117,6 @@ void UpdateGUI(program *Program){
 	r32 CursorHoldMagnitude = Program->FftDecayMagDb[(int)(Program->CursorVal*Program->ReadSize/2)];
 	snprintf(Buffer, 32, "%8.2f dBFS", CursorHoldMagnitude);
 	DrawString(Buffer, 1.0f-0.05f*SF, 1.0f-0.4f*SF*AR, 4.0f, TF_AlignRight, &Program->TempArena, &Program->RenderCtx);
-
 	u8 FFTUpButtonFlags   = Program->Paused || (Program->ReadSize*2 > MaxReadSize) ? BF_INACTIVE : 0;
 	u8 FFTDownButtonFlags = Program->Paused || (Program->ReadSize/2 <= 16) ? BF_INACTIVE : 0;
 	if(Button(1, "+", (rect){1.0f-0.25*SF, 0.0f, 0.15*SF, 0.15*SF*AR}, FFTUpButtonFlags, &Program->UiCtx, &Program->TempArena, &Program->RenderCtx)){
@@ -235,7 +234,7 @@ bool Frame(void *Memory, u64 MemorySize, u32 WindowWidth, u32 WindowHeight, r32 
 	//Handle sustain and decay
 	if(!Program->Paused){
 		for(int i = 0; i < FftSize; i++){
-			if(Program->FftDecayMagDb[i] < Program->FftAvgMagDb[i] || !Program->DecayReset){
+			if(Program->FftDecayMagDb[i] <= Program->FftAvgMagDb[i] || !Program->DecayReset){
 				Program->FftDecayMagDb[i] = Program->FftAvgMagDb[i];
 				Program->FftDecayTime[i] = 0.1;
 			}
@@ -243,6 +242,9 @@ bool Frame(void *Memory, u64 MemorySize, u32 WindowWidth, u32 WindowHeight, r32 
 				if(!Program->MaxHold){
 					if(Program->FftDecayTime[i] < 0.0){
 						Program->FftDecayMagDb[i] -= 2.0f;
+						if(Program->FftDecayMagDb[i] <= Program->FftAvgMagDb[i]){
+							Program->FftDecayMagDb[i] = Program->FftAvgMagDb[i];
+						}
 					}
 					else{
 						Program->FftDecayTime[i] -= FRAME_TIME;

@@ -107,7 +107,7 @@ bool Button(u32 Id, char *Text, rect Rect, u8 Flags, uiCtx *Ctx, memoryArena *Ar
 		Rect.x+Rect.w, Rect.y,
 		Rect.x+Rect.w, Rect.y+Rect.h,
 	};
-	DrawTriangles(RectPoints, 12, Lightness*1.0f, Lightness*0.5f, 0.0f, RenderCtx);
+	DrawTriangles(RectPoints, 6, Lightness*1.0f, Lightness*0.5f, 0.0f, RenderCtx);
 
 	r32 Points[10] = {
 		Rect.x,        Rect.y,
